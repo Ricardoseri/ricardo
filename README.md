@@ -2,11 +2,19 @@
 
 本仓库提供一个 Bash 自动检测脚本，用于对麒麟/Kylin V10 主机执行安全基线核查并生成审计证据。检测项覆盖用户提供的 01-01 到 15-03 检查点，包括系统版本、补丁、终端安全、服务端口、SSH、账号与 sudo、口令策略、登录失败锁定、审计日志、防火墙、文件权限、USB、无线/蓝牙、磁盘加密备份、TPM/Secure Boot/可信组件等。
 
-## 快速使用
+## 下载后在麒麟主机上手工运行
+
+本工具只提供可下载的脚本代码，不包含 GitHub Actions、定时任务、后台守护进程或任何云端自动执行逻辑。下载仓库或单独下载 `kylin_v10_os_check.sh` 后，把脚本复制到需要检查的麒麟 V10 主机上，由管理员手工执行即可。
 
 ```bash
 chmod +x kylin_v10_os_check.sh
 sudo ./kylin_v10_os_check.sh
+```
+
+如需先查看用法而不执行检测：
+
+```bash
+./kylin_v10_os_check.sh --help
 ```
 
 脚本默认在当前目录生成如下目录：
@@ -19,10 +27,11 @@ kylin_v10_os_check_<hostname>_<YYYYmmdd_HHMMSS>/
 └── summary.jsonl  # JSON Lines 明细
 ```
 
-也可以指定输出目录：
+也可以指定输出目录，两种写法等价：
 
 ```bash
 sudo ./kylin_v10_os_check.sh /tmp/kylin_check_result
+sudo ./kylin_v10_os_check.sh -o /tmp/kylin_check_result
 ```
 
 ## 输出结果含义
@@ -75,6 +84,7 @@ sudo PATCH_THRESHOLD_DAYS=15 AUDIT_RETENTION_DAYS=90 ./kylin_v10_os_check.sh
 
 ## 注意事项
 
+- 本仓库只是生成/保存检测代码；不会替你在云端或当前开发环境自动检查真实麒麟主机。
 - 建议使用 `root` 或 `sudo` 运行，否则 `/etc/shadow`、audit、iptables/nft、部分硬件和日志证据可能无法完整采集。
 - 脚本以采集和判定为主，不会主动修改系统配置。
 - `MANUAL` 项不是脚本缺陷，而是因为对应检查依赖人工台账、管理制度、网络边界、终端管控平台或 BIOS/UEFI 状态。

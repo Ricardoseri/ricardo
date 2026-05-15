@@ -16,22 +16,99 @@ GUI_LOCK_SECONDS="${GUI_LOCK_SECONDS:-600}"
 
 HOSTNAME_SAFE="$(hostname 2>/dev/null | tr -c 'A-Za-z0-9._-' '_' | sed 's/_$//' || echo unknown-host)"
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
-OUT_DIR="${1:-./kylin_v10_os_check_${HOSTNAME_SAFE}_${TIMESTAMP}}"
-EVIDENCE_DIR="${OUT_DIR}/evidence"
-REPORT_FILE="${OUT_DIR}/report.md"
-SUMMARY_CSV="${OUT_DIR}/summary.csv"
-SUMMARY_JSONL="${OUT_DIR}/summary.jsonl"
-
-mkdir -p "$EVIDENCE_DIR"
-: > "$SUMMARY_CSV"
-: > "$SUMMARY_JSONL"
-printf '编号,检查点,结果,判定依据,证据文件,整改建议\n' > "$SUMMARY_CSV"
+DEFAULT_OUT_DIR="./kylin_v10_os_check_${HOSTNAME_SAFE}_${TIMESTAMP}"
+OUT_DIR=""
+EVIDENCE_DIR=""
+REPORT_FILE=""
+SUMMARY_CSV=""
+SUMMARY_JSONL=""
 
 REPORT_ROWS=()
 PASS_COUNT=0
 FAIL_COUNT=0
 WARN_COUNT=0
 MANUAL_COUNT=0
+
+usage() {
+  cat <<'USAGE'
+麒麟 V10 操作系统安全基线自动检测工具
+
+用法:
+  ./kylin_v10_os_check.sh [输出目录]
+  ./kylin_v10_os_check.sh -o /path/to/output
+
+选项:
+  -o, --output DIR   指定检测结果输出目录
+  -h, --help         显示帮助信息，不执行检测
+  -V, --version      显示版本号，不执行检测
+
+说明:
+  - 本脚本不会自动在云端或后台运行；只有在麒麟主机上手工执行本文件时才会开始检测。
+  - 建议使用 root 或 sudo 执行，以便完整采集 /etc/shadow、audit、nft/iptables 等证据。
+USAGE
+}
+
+parse_args() {
+  OUT_DIR="$DEFAULT_OUT_DIR"
+  while (($# > 0)); do
+    case "$1" in
+      -h|--help)
+        usage
+        exit 0
+        ;;
+      -V|--version)
+        printf '%s\n' "$VERSION"
+        exit 0
+        ;;
+      -o|--output)
+        if [[ $# -lt 2 || -z "${2:-}" ]]; then
+          printf '错误：%s 需要指定输出目录。\n' "$1" >&2
+          exit 2
+        fi
+        OUT_DIR="$2"
+        shift 2
+        ;;
+      --)
+        shift
+        break
+        ;;
+      -*)
+        printf '错误：未知选项 %s\n' "$1" >&2
+        usage >&2
+        exit 2
+        ;;
+      *)
+        if [[ "$OUT_DIR" != "$DEFAULT_OUT_DIR" ]]; then
+          printf '错误：只能指定一个输出目录。\n' >&2
+          usage >&2
+          exit 2
+        fi
+        OUT_DIR="$1"
+        shift
+        ;;
+    esac
+  done
+  if (($# > 0)); then
+    if [[ "$OUT_DIR" != "$DEFAULT_OUT_DIR" ]]; then
+      printf '错误：只能指定一个输出目录。\n' >&2
+      usage >&2
+      exit 2
+    fi
+    OUT_DIR="$1"
+  fi
+}
+
+init_output() {
+  EVIDENCE_DIR="${OUT_DIR}/evidence"
+  REPORT_FILE="${OUT_DIR}/report.md"
+  SUMMARY_CSV="${OUT_DIR}/summary.csv"
+  SUMMARY_JSONL="${OUT_DIR}/summary.jsonl"
+
+  mkdir -p "$EVIDENCE_DIR"
+  : > "$SUMMARY_CSV"
+  : > "$SUMMARY_JSONL"
+  printf '编号,检查点,结果,判定依据,证据文件,整改建议\n' > "$SUMMARY_CSV"
+}
 
 escape_md() {
   local s="${1//$'\n'/ }"
@@ -551,6 +628,8 @@ write_report() {
 }
 
 main() {
+  parse_args "$@"
+  init_output
   collect_01_system_info
   collect_02_patch_update
   collect_03_antivirus_edr
@@ -572,4 +651,6 @@ main() {
   printf '汇总 JSONL：%s\n' "$SUMMARY_JSONL"
 }
 
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi
